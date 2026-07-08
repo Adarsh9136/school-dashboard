@@ -10,9 +10,9 @@ router.post('/login', async (req, res) => {
   const { username, password } = req.body || {};
   if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
   const user = await User.findOne({ username: username.toLowerCase().trim() });
-  if (!user || !user.active) return res.status(401).json({ error: 'Invalid credentials' });
+  if (!user || !user.active) return res.status(401).json({ error: 'User not found' });
   const ok = await bcrypt.compare(password, user.passwordHash);
-  if (!ok) return res.status(401).json({ error: 'Invalid credentials' });
+  if (!ok) return res.status(401).json({ error: 'Invalid credentials.' });
   const token = signToken(user);
   await writeAudit({ action: 'login', entity: 'user', entityId: user._id, user, ip: req.ip });
   res.json({ token, user: user.toPublic() });
