@@ -1,0 +1,104 @@
+{
+  "project": "Resonance International School ERP",
+  "global_aesthetic": "Old Money Tech. A premium blend of academic heritage (serifs, deep tones) and high-performance SaaS (clean lines, modular grids). Think Framer/Linear quality tailored for an elite Indian international school.",
+  "typography": {
+    "fonts_to_install": ["Playfair Display", "Outfit", "JetBrains Mono"],
+    "headings": "font-serif ('Playfair Display')",
+    "body": "font-sans ('Outfit')",
+    "mono": "font-mono ('JetBrains Mono')",
+    "rules": [
+      "NO Inter, Roboto, or Open Sans. Banned.",
+      "Headings > 32px MUST use tracking-tight and specific weights (font-black or font-light).",
+      "Overlines/Labels MUST be Uppercase + tracking-widest.",
+      "Data, PRNs, Class IDs, and numeric tables MUST use JetBrains Mono."
+    ]
+  },
+  "colors": {
+    "light": {
+      "base_bg": "#FDFBF7",
+      "surface": "#FFFFFF",
+      "primary": "#7A1022",
+      "secondary": "#1E3F2D",
+      "accent": "#C4A454",
+      "text_main": "#1A1A1A",
+      "text_muted": "#666666",
+      "border": "#E5E5E5"
+    },
+    "dark": {
+      "base_bg": "#0B0B0C",
+      "surface": "#141416",
+      "primary": "#E53935",
+      "secondary": "#81C784",
+      "accent": "#F2C94C",
+      "text_main": "#EDEDED",
+      "text_muted": "#A0A0A0",
+      "border": "#2A2A2A"
+    },
+    "rules": [
+      "No purple-on-white gradients.",
+      "Use 'Tinted Grey' rule: never pure black or gray, always tint with the base hue.",
+      "Hover state color MUST be explicitly set (e.g., hover:bg-primary/90 hover:text-white)."
+    ]
+  },
+  "motion_and_animations": {
+    "libraries": ["framer-motion", "lucide-react", "canvas-confetti", "react-countup", "react-beautiful-dnd", "recharts"],
+    "global_fps": "Ensure 60 FPS by using hardware-accelerated transforms (transform, opacity only).",
+    "patterns": {
+      "hero": "Aurora light gradient background using CSS keyframes, Staggered text reveal (y:20 to 0, opacity 0 to 1), magnetic hover CTAs.",
+      "dashboard_cards": "Staggered fade-in on mount. Hover state: y: -4px, scale: 1.01, subtle shadow glow (shadow-xl shadow-primary/10).",
+      "attendance_cells": "Flash green/red on click using rapid CSS animation, strict grid layout.",
+      "leave_management": "Trigger canvas-confetti upon 'Approved' status state change.",
+      "cursor": "Custom animated cursor using framer-motion, following mouse position with spring physics.",
+      "charts": "Recharts with initial drawing animations."
+    }
+  },
+  "component_recipes": {
+    "navbar": "Glassmorphism: backdrop-blur-xl bg-white/70 (light) or bg-black/60 (dark), 1px bottom border border-black/5. Sticky top, z-50. NO fully transparent backgrounds.",
+    "dashboard_kpi_card": "Flat surface, 1px border. On hover: slight lift, border color transitions to primary, shadow-lg.",
+    "empty_states": "Minimalist illustrations or icons, with a clear Next Best Action CTA.",
+    "floating_label_forms": "Input wrappers with relative positioning. Label absolute, transitions -translate-y-4 scale-75 on focus or when populated.",
+    "timetable_slot": "Use react-beautiful-dnd. Draggable blocks with 'grab' cursor. Background changes on drag."
+  },
+  "image_urls": [
+    {
+      "category": "hero_campus",
+      "url": "https://images.unsplash.com/photo-1758611228434-7b5b697abd0a?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2NzB8MHwxfHNlYXJjaHwzfHxtb2Rlcm4lMjBzY2hvb2wlMjBidWlsZGluZyUyMGNhbXB1cyUyMGV4dGVyaW9yfGVufDB8fHx8MTc4MzUzNDQyOHww&ixlib=rb-4.1.0&q=85",
+      "description": "Modern school building campus exterior at twilight."
+    },
+    {
+      "category": "classroom_students",
+      "url": "https://images.unsplash.com/photo-1509062522246-3755977927d7?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2Mzl8MHwxfHNlYXJjaHwxfHxkaXZlcnNlJTIwc3R1ZGVudHMlMjBjbGFzc3Jvb20lMjBsZWFybmluZyUyMG1vZGVybnxlbnwwfHx8fDE3ODM1MzQ0Mjl8MA&ixlib=rb-4.1.0&q=85",
+      "description": "Diverse students in modern classroom."
+    },
+    {
+      "category": "teacher_portrait",
+      "url": "https://images.pexels.com/photos/8423008/pexels-photo-8423008.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "description": "Teacher engaging students in modern classroom."
+    },
+    {
+      "category": "library",
+      "url": "https://images.unsplash.com/photo-1763582516354-e417d2902207?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzOTB8MHwxfHNlYXJjaHwyfHxzY2hvb2wlMjBsaWJyYXJ5JTIwbW9kZXJuJTIwcmVhZGluZ3xlbnwwfHx8fDE3ODM1MzQ0Mjh8MA&ixlib=rb-4.1.0&q=85",
+      "description": "Modern library interior with stairs and reading space."
+    },
+    {
+      "category": "sports_activities",
+      "url": "https://images.unsplash.com/photo-1717584146940-118a65525da8?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA1OTB8MHwxfHNlYXJjaHwzfHxzY2hvb2wlMjBjaGlsZHJlbiUyMHJ1bm5pbmclMjBzcG9ydHN8ZW58MHx8fHwxNzgzNTM0NDI5fDA&ixlib=rb-4.1.0&q=85",
+      "description": "Children running and playing sports."
+    }
+  ],
+  "instructions_to_main_agent": {
+    "routing": "Create a hybrid React app with React Router. Public routes for Marketing (Home, About, Admission). Protected routes (/dashboard) for Admin, Teacher, Parent, Accountant.",
+    "role_based_logic": "Mock authentication but enforce UI separation. E.g., Parents see 'Paid/Pending' for Fees but NO raw amounts. Admin sees full analytics.",
+    "styling": "Use Tailwind CSS. Avoid centering everything; use optical alignment and negative space (p-8 to p-12).",
+    "data_testing": "Add data-testid to EVERY interactive element (buttons, forms, links, cards)."
+  },
+  "UNIVERSAL_GUIDELINES_FOR_MAIN_AGENT": [
+    "You tend to converge toward generic outputs. Break this. Do not make generic centered layouts, simplistic gradients, or uniform styling.",
+    "Never use Emoji characters like 🤖🧠 for icons. Use lucide-react.",
+    "Create depth through layered design elements with z-index hierarchy.",
+    "Use glass-morphism effects with backdrop filters (12-24px blur) with a 1px border. Never fully transparent.",
+    "Every interaction needs micro-animations - hover states, transitions, entrance animations. Static = dead.",
+    "ALWAYS explicitly assign colors on hover. NEVER use generic transition-all. Use transform and opacity specifically.",
+    "Ensure the JSON data-testid attributes are kebab-case and role-based."
+  ]
+}
