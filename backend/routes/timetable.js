@@ -7,6 +7,27 @@ const { writeAudit } = require('../utils/audit');
 
 const router = express.Router();
 
+// Compute classes affected by a teacher's absence within a date range
+router.get('/affected', auth, requireRole('principal', 'admin'), async (req, res) => {
+  const { teacherId, fromDate, toDate } = req.query;
+  if (!teacherId || !fromDate || !toDate) return res.status(400).json({ error: 'teacherId, fromDate, toDate required' });
+  const start = new Date(fromDate);
+  const end = new Date(toDate);
+  if (isNaN(start) || isNaN(end)) return res.status(400).json({ error: 'invalid dates' });
+  const dayName = (d) => ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][d.getDay()];
+  const out = [];
+  const cursor = new Date(start);
+  while (cursor <= end) {
+    const day = dayName(cursor);
+    if (day !== 'Sunday') {
+      const slots = await Timetable.find({ teacherId, day }).sort({ period: 1 });
+      out.push({ date: cursor.toISOString().slice(0, 10), day, slots });
+    }
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  res.json(out);
+});
+
 // GET timetable for a class/section OR for a teacher
 router.get('/', auth, async (req, res) => {
   const { className, section, teacherId } = req.query;

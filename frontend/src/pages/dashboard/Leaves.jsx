@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Plus, Check, X, ClockAlert } from 'lucide-react';
+import { Plus, Check, X, ClockAlert, ChevronDown, ArrowRightLeft } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import api from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
@@ -13,23 +13,105 @@ const statusStyles = {
   rejected: { cls: 'border-primary/50 bg-primary/10 text-primary', label: 'Rejected' },
 };
 
+function AffectedClasses({ leave, teachers, onReassigned }) {
+  const [days, setDays] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState({});
+
+  useEffect(() => {
+    api.get('/timetable/affected', {
+      params: { teacherId: leave.teacherId, fromDate: leave.fromDate, toDate: leave.toDate },
+    }).then(r => setDays(r.data)).catch(() => setDays([])).finally(() => setLoading(false));
+  }, [leave._id]); // eslint-disable-line
+
+  const reassign = async (slot, newTeacherId) => {
+    if (!newTeacherId) return;
+    const key = slot._id;
+    setBusy(b => ({ ...b, [key]: true }));
+    const teacher = teachers.find(t => t._id === newTeacherId);
+    try {
+      await api.post(`/timetable/${slot._id}/substitute`, {
+        teacherId: newTeacherId,
+        teacherName: teacher?.fullName || '',
+      });
+      toast.success(`${teacher?.fullName} assigned as substitute`);
+      // reflect locally
+      setDays(ds => ds.map(d => ({
+        ...d,
+        slots: d.slots.map(s => s._id === slot._id ? { ...s, teacherId: newTeacherId, teacherName: teacher?.fullName || '', isSubstitute: true, originalTeacherId: leave.teacherId } : s),
+      })));
+      onReassigned && onReassigned();
+    } catch (e) { toast.error('Failed'); }
+    setBusy(b => ({ ...b, [key]: false }));
+  };
+
+  if (loading) return <div className="mt-4 skeleton h-24" />;
+  const anySlots = days.some(d => d.slots.length > 0);
+  if (!anySlots) return <p className="mt-4 text-xs text-muted-foreground italic">No classes affected in this range.</p>;
+
+  return (
+    <div className="mt-4 space-y-4">
+      {days.map(d => d.slots.length > 0 && (
+        <div key={d.date} className="rounded-xl border border-border bg-background/40 p-4" data-testid={`affected-day-${d.date}`}>
+          <p className="overline mb-3">{d.day} · <span className="text-foreground">{d.date}</span></p>
+          <div className="grid gap-2">
+            {d.slots.map(s => (
+              <div key={s._id} className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card p-3" data-testid={`affected-slot-${s._id}`}>
+                <div className="h-9 w-9 rounded-md bg-primary/10 text-primary grid place-items-center mono text-xs">P{s.period}</div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium">{s.subject}</p>
+                  <p className="text-[11px] mono text-muted-foreground">{s.className}-{s.section} · Currently: {s.teacherName || '—'}{s.isSubstitute ? ' (SUB)' : ''}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <ArrowRightLeft size={12} className="text-muted-foreground" />
+                  <select
+                    defaultValue=""
+                    onChange={e => reassign(s, e.target.value)}
+                    disabled={busy[s._id]}
+                    className="h-9 px-2 rounded-md border border-border bg-background text-xs focus:border-primary outline-none max-w-[220px]"
+                    data-testid={`reassign-select-${s._id}`}
+                  >
+                    <option value="">Assign substitute…</option>
+                    {teachers.filter(t => t._id !== leave.teacherId).map(t => (
+                      <option key={t._id} value={t._id}>{t.fullName}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function Leaves() {
   const { user } = useAuth();
   const [items, setItems] = useState([]);
+  const [teachers, setTeachers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [drawer, setDrawer] = useState(false);
   const [form, setForm] = useState({ fromDate: '', toDate: '', reason: '', leaveType: 'casual' });
   const [saving, setSaving] = useState(false);
+  const [expanded, setExpanded] = useState({});
 
   const isTeacher = user.role === 'teacher';
   const canReview = ['principal', 'admin'].includes(user.role);
 
   const load = async () => {
     setLoading(true);
-    try { const { data } = await api.get('/leaves'); setItems(data); } catch(e){}
+    try {
+      const [l, t] = await Promise.all([
+        api.get('/leaves'),
+        canReview ? api.get('/teachers') : Promise.resolve({ data: [] }),
+      ]);
+      setItems(l.data);
+      setTeachers(t.data);
+    } catch(e){}
     setLoading(false);
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, []); // eslint-disable-line
 
   const submit = async (e) => {
     e.preventDefault(); setSaving(true);
@@ -53,6 +135,8 @@ export default function Leaves() {
           origin: { y: 0.6 },
           colors: ['#C4A454', '#1E3F2D', '#7A1022', '#FDFBF7'],
         });
+        // auto-expand affected classes for reassignment
+        setExpanded(x => ({ ...x, [leave._id]: true }));
       }
       toast.success(`Leave ${status}`);
       load();
@@ -82,31 +166,57 @@ export default function Leaves() {
         <div className="grid gap-3">
           {items.map((l, i) => {
             const s = statusStyles[l.status];
+            const isExpanded = expanded[l._id];
+            const showAffected = canReview && (l.status === 'approved' || l.status === 'pending');
             return (
               <motion.div
                 key={l._id}
                 initial={{ opacity: 0, x: -30 }} animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: i * 0.05 }}
-                className="rounded-2xl border border-border bg-card p-5 flex flex-wrap items-center gap-4"
+                className="rounded-2xl border border-border bg-card p-5"
                 data-testid={`leave-card-${l._id}`}
               >
-                <div className="h-12 w-12 rounded-xl bg-primary/10 text-primary grid place-items-center font-serif text-lg">{l.teacherName[0]}</div>
-                <div className="flex-1 min-w-[200px]">
-                  <p className="font-medium">{l.teacherName}</p>
-                  <p className="text-xs mono text-muted-foreground mt-0.5">{l.fromDate} → {l.toDate} · {l.leaveType}</p>
-                  <p className="text-sm text-muted-foreground mt-1">{l.reason}</p>
-                </div>
-                <motion.span
-                  key={l.status}
-                  initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-                  className={`text-xs mono uppercase tracking-widest px-3 py-1.5 rounded-full border ${s.cls}`}
-                >{s.label}</motion.span>
-                {canReview && l.status === 'pending' && (
-                  <div className="flex items-center gap-2">
-                    <button onClick={() => review(l, 'approved')} className="h-10 w-10 rounded-full border border-secondary/60 text-secondary hover:bg-secondary/10 grid place-items-center transition-colors" data-testid={`approve-${l._id}`}><Check size={16} /></button>
-                    <button onClick={() => review(l, 'rejected')} className="h-10 w-10 rounded-full border border-primary/60 text-primary hover:bg-primary/10 grid place-items-center transition-colors" data-testid={`reject-${l._id}`}><X size={16} /></button>
+                <div className="flex flex-wrap items-center gap-4">
+                  <div className="h-12 w-12 rounded-xl bg-primary/10 text-primary grid place-items-center font-serif text-lg">{l.teacherName[0]}</div>
+                  <div className="flex-1 min-w-[200px]">
+                    <p className="font-medium">{l.teacherName}</p>
+                    <p className="text-xs mono text-muted-foreground mt-0.5">{l.fromDate} → {l.toDate} · {l.leaveType}</p>
+                    <p className="text-sm text-muted-foreground mt-1">{l.reason}</p>
                   </div>
-                )}
+                  <motion.span
+                    key={l.status}
+                    initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+                    className={`text-xs mono uppercase tracking-widest px-3 py-1.5 rounded-full border ${s.cls}`}
+                  >{s.label}</motion.span>
+                  {canReview && l.status === 'pending' && (
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => review(l, 'approved')} className="h-10 w-10 rounded-full border border-secondary/60 text-secondary hover:bg-secondary/10 grid place-items-center transition-colors" data-testid={`approve-${l._id}`}><Check size={16} /></button>
+                      <button onClick={() => review(l, 'rejected')} className="h-10 w-10 rounded-full border border-primary/60 text-primary hover:bg-primary/10 grid place-items-center transition-colors" data-testid={`reject-${l._id}`}><X size={16} /></button>
+                    </div>
+                  )}
+                  {showAffected && (
+                    <button
+                      onClick={() => setExpanded(x => ({ ...x, [l._id]: !x[l._id] }))}
+                      className="text-xs mono link-underline text-primary inline-flex items-center gap-1"
+                      data-testid={`toggle-affected-${l._id}`}
+                    >
+                      {isExpanded ? 'Hide' : 'Show'} affected classes
+                      <ChevronDown size={12} className={`transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                    </button>
+                  )}
+                </div>
+                <AnimatePresence>
+                  {showAffected && isExpanded && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      className="overflow-hidden"
+                    >
+                      <AffectedClasses leave={l} teachers={teachers} onReassigned={load} />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </motion.div>
             );
           })}
