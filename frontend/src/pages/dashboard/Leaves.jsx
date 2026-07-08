@@ -17,6 +17,7 @@ function AffectedClasses({ leave, teachers, onReassigned }) {
   const [days, setDays] = useState([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState({});
+  const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
     api.get('/timetable/affected', {
@@ -26,6 +27,12 @@ function AffectedClasses({ leave, teachers, onReassigned }) {
 
   const reassign = async (slot, newTeacherId) => {
     if (!newTeacherId) return;
+    const conflict = slot.conflicts && slot.conflicts[newTeacherId];
+    if (conflict) {
+      const label = conflict === 'scheduled' ? 'already teaching another class' : 'on leave';
+      const proceed = window.confirm(`⚠ Conflict: this teacher is ${label} at ${slot.day} · Period ${slot.period}. Assign anyway?`);
+      if (!proceed) return;
+    }
     const key = slot._id;
     setBusy(b => ({ ...b, [key]: true }));
     const teacher = teachers.find(t => t._id === newTeacherId);
@@ -34,8 +41,7 @@ function AffectedClasses({ leave, teachers, onReassigned }) {
         teacherId: newTeacherId,
         teacherName: teacher?.fullName || '',
       });
-      toast.success(`${teacher?.fullName} assigned as substitute`);
-      // reflect locally
+      toast.success(`${teacher?.fullName} assigned as substitute${conflict ? ' (conflict override)' : ''}`);
       setDays(ds => ds.map(d => ({
         ...d,
         slots: d.slots.map(s => s._id === slot._id ? { ...s, teacherId: newTeacherId, teacherName: teacher?.fullName || '', isSubstitute: true, originalTeacherId: leave.teacherId } : s),
@@ -51,34 +57,65 @@ function AffectedClasses({ leave, teachers, onReassigned }) {
 
   return (
     <div className="mt-4 space-y-4">
+      <div className="flex items-center justify-end">
+        <label className="flex items-center gap-2 text-[11px] mono text-muted-foreground cursor-pointer">
+          <input
+            type="checkbox"
+            checked={showAll}
+            onChange={e => setShowAll(e.target.checked)}
+            className="h-3.5 w-3.5 accent-primary"
+            data-testid={`show-all-teachers-${leave._id}`}
+          />
+          Include busy teachers (with warning)
+        </label>
+      </div>
       {days.map(d => d.slots.length > 0 && (
         <div key={d.date} className="rounded-xl border border-border bg-background/40 p-4" data-testid={`affected-day-${d.date}`}>
           <p className="overline mb-3">{d.day} · <span className="text-foreground">{d.date}</span></p>
           <div className="grid gap-2">
-            {d.slots.map(s => (
-              <div key={s._id} className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card p-3" data-testid={`affected-slot-${s._id}`}>
-                <div className="h-9 w-9 rounded-md bg-primary/10 text-primary grid place-items-center mono text-xs">P{s.period}</div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium">{s.subject}</p>
-                  <p className="text-[11px] mono text-muted-foreground">{s.className}-{s.section} · Currently: {s.teacherName || '—'}{s.isSubstitute ? ' (SUB)' : ''}</p>
+            {d.slots.map(s => {
+              const conflicts = s.conflicts || {};
+              const candidates = teachers.filter(t => t._id !== leave.teacherId);
+              const free = candidates.filter(t => !conflicts[t._id]);
+              const busyTeachers = candidates.filter(t => conflicts[t._id]);
+              const shown = showAll ? [...free, ...busyTeachers] : free;
+              return (
+                <div key={s._id} className="flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card p-3" data-testid={`affected-slot-${s._id}`}>
+                  <div className="h-9 w-9 rounded-md bg-primary/10 text-primary grid place-items-center mono text-xs">P{s.period}</div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">{s.subject}</p>
+                    <p className="text-[11px] mono text-muted-foreground">{s.className}-{s.section} · Currently: {s.teacherName || '—'}{s.isSubstitute ? ' (SUB)' : ''}</p>
+                    <p className="text-[10px] mono text-muted-foreground/70 mt-0.5">{free.length} available · {busyTeachers.length} busy</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <ArrowRightLeft size={12} className="text-muted-foreground" />
+                    <select
+                      defaultValue=""
+                      onChange={e => { reassign(s, e.target.value); e.target.value = ''; }}
+                      disabled={busy[s._id] || shown.length === 0}
+                      className="h-9 px-2 rounded-md border border-border bg-background text-xs focus:border-primary outline-none max-w-[240px] disabled:opacity-50"
+                      data-testid={`reassign-select-${s._id}`}
+                    >
+                      <option value="">
+                        {shown.length === 0 ? 'No available teachers' : 'Assign substitute…'}
+                      </option>
+                      {free.map(t => (
+                        <option key={t._id} value={t._id}>{t.fullName}</option>
+                      ))}
+                      {showAll && busyTeachers.length > 0 && (
+                        <optgroup label="Busy (will warn)">
+                          {busyTeachers.map(t => (
+                            <option key={t._id} value={t._id}>
+                              {t.fullName} — {conflicts[t._id] === 'scheduled' ? 'teaching' : 'on leave'}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
+                    </select>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <ArrowRightLeft size={12} className="text-muted-foreground" />
-                  <select
-                    defaultValue=""
-                    onChange={e => reassign(s, e.target.value)}
-                    disabled={busy[s._id]}
-                    className="h-9 px-2 rounded-md border border-border bg-background text-xs focus:border-primary outline-none max-w-[220px]"
-                    data-testid={`reassign-select-${s._id}`}
-                  >
-                    <option value="">Assign substitute…</option>
-                    {teachers.filter(t => t._id !== leave.teacherId).map(t => (
-                      <option key={t._id} value={t._id}>{t.fullName}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       ))}

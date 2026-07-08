@@ -7,7 +7,10 @@ const { writeAudit } = require('../utils/audit');
 
 const router = express.Router();
 
-// Compute classes affected by a teacher's absence within a date range
+// Compute classes affected by a teacher's absence within a date range.
+// For each affected slot, also compute which teachers CANNOT substitute (conflicts):
+//   - teachers already teaching another class at that same day+period
+//   - teachers on approved/pending leave covering that date
 router.get('/affected', auth, requireRole('principal', 'admin'), async (req, res) => {
   const { teacherId, fromDate, toDate } = req.query;
   if (!teacherId || !fromDate || !toDate) return res.status(400).json({ error: 'teacherId, fromDate, toDate required' });
@@ -15,13 +18,42 @@ router.get('/affected', auth, requireRole('principal', 'admin'), async (req, res
   const end = new Date(toDate);
   if (isNaN(start) || isNaN(end)) return res.status(400).json({ error: 'invalid dates' });
   const dayName = (d) => ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][d.getDay()];
+
+  // Preload all leaves that could overlap the requested range (excluding the leave being planned around).
+  // We treat approved OR pending leaves as blocking to be safe.
+  const Leave = require('../models/Leave');
+  const overlappingLeaves = await Leave.find({
+    status: { $in: ['approved', 'pending'] },
+    fromDate: { $lte: toDate },
+    toDate: { $gte: fromDate },
+  });
+
   const out = [];
   const cursor = new Date(start);
   while (cursor <= end) {
     const day = dayName(cursor);
+    const dateISO = cursor.toISOString().slice(0, 10);
     if (day !== 'Sunday') {
       const slots = await Timetable.find({ teacherId, day }).sort({ period: 1 });
-      out.push({ date: cursor.toISOString().slice(0, 10), day, slots });
+      // For each slot, find conflicts
+      const enriched = [];
+      for (const s of slots) {
+        // Teachers already scheduled at same day+period (excluding the on-leave teacher)
+        const scheduled = await Timetable.find({ day, period: s.period, teacherId: { $ne: '' } });
+        const scheduledTeacherIds = scheduled.map(x => x.teacherId).filter(id => id && id !== teacherId);
+
+        // Teachers on leave that day
+        const onLeaveTeacherIds = overlappingLeaves
+          .filter(l => l.fromDate <= dateISO && l.toDate >= dateISO)
+          .map(l => l.teacherId);
+
+        const conflicts = {};
+        scheduledTeacherIds.forEach(id => { conflicts[id] = 'scheduled'; });
+        onLeaveTeacherIds.forEach(id => { if (!conflicts[id]) conflicts[id] = 'on_leave'; });
+
+        enriched.push({ ...s.toObject(), conflicts });
+      }
+      out.push({ date: dateISO, day, slots: enriched });
     }
     cursor.setDate(cursor.getDate() + 1);
   }
