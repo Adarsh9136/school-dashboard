@@ -41,13 +41,19 @@ app.use((err, req, res, next) => {
 const PORT = parseInt(process.env.PORT || '8001', 10);
 const HOST = '0.0.0.0';
 
-connectDB()
-  .then(() => {
-    app.listen(PORT, HOST, () => {
-      console.log(`[server] Resonance ERP API listening on ${HOST}:${PORT}`);
+if (process.env.VERCEL) {
+  // Serverless mode — do not bind a port. The api/index.js handler will connect to Mongo and forward requests.
+  module.exports = app;
+} else {
+  connectDB()
+    .then(() => {
+      app.listen(PORT, HOST, () => {
+        console.log(`[server] Resonance ERP API listening on ${HOST}:${PORT}`);
+      });
+    })
+    .catch(err => {
+      console.error('[server] failed to start', err);
+      process.exit(1);
     });
-  })
-  .catch(err => {
-    console.error('[server] failed to start', err);
-    process.exit(1);
-  });
+  module.exports = app;
+}
