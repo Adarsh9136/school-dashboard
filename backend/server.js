@@ -12,7 +12,7 @@ app.use(morgan('dev'));
 
 // Health
 app.get('/api/health', (req, res) => res.json({ status: 'ok', service: 'resonance-erp', time: new Date().toISOString() }));
-app.get('/api/', (req, res) => res.json({ message: 'Resonance International School ERP API', version: '1.0.0' }));
+app.get('/api/', (req, res) => res.json({ message: 'Resonance International School ERP API', version: '1.0.1' }));
 
 // Routes — all under /api prefix
 app.use('/api/auth', require('./routes/auth'));
