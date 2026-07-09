@@ -158,9 +158,14 @@ export default function Timetable() {
                             data-testid={`slot-${d}-${p}`}
                           >
                             {isTeacher && (
+                              <>
                               <p className="text-xs font-medium leading-tight">
-                                {s.className} {s.section} - {s.subject}
+                              {s.className} {s.section}
                               </p>
+                              <p className="text-[10px] mono text-muted-foreground mt-1 truncate">
+                              {s.subject}
+                              </p>
+                            </>
                             )}
 
                             {!isTeacher && (
