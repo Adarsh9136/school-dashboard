@@ -157,8 +157,22 @@ export default function Timetable() {
                             className={`relative rounded-lg p-3 border transition-[transform,border-color,background-color] ${clickable ? 'cursor-pointer hover:-translate-y-0.5 hover:border-primary/60' : ''} ${s.isSubstitute ? 'border-accent/60 bg-accent/10' : 'border-border bg-muted/30'}`}
                             data-testid={`slot-${d}-${p}`}
                           >
-                            <p className="text-xs font-medium leading-tight">{s.subject}</p>
-                            <p className="text-[10px] mono text-muted-foreground mt-1 truncate">{s.teacherName || '—'}</p>
+                            {isTeacher && (
+                              <p className="text-xs font-medium leading-tight">
+                                {s.className} {s.section} - {s.subject}
+                              </p>
+                            )}
+
+                            {!isTeacher && (
+                              <>
+                                <p className="text-xs font-medium leading-tight">
+                                  {s.subject}
+                                </p>
+                                <p className="text-[10px] mono text-muted-foreground mt-1 truncate">
+                                  {s.teacherName || '—'}
+                                </p>
+                              </>
+                            )}
                             {s.isSubstitute && <span className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-accent" title="Substitute" />}
                             {clickable && <Pencil size={10} className="absolute bottom-1 right-1 text-muted-foreground/60" />}
                           </motion.div>
