@@ -8,10 +8,28 @@ import EmptyState from '@/components/common/EmptyState';
 
 const emptyForm = {
   employeeId: '', fullName: '', email: '', phone: '',
-  subjects: '', classes: '', qualification: '', joiningDate: '',
+  subjects: '', classes: [], qualification: '', joiningDate: '',
   username: '', password: '',
 };
+const grades = [
+  'Nursery',
+  'LKG',
+  'UKG',
+  'I',
+  'II',
+  'III',
+  'IV',
+  'V',
+  'VI',
+  'VII',
+  'VIII',
+  'IX',
+  'X',
+  'XI',
+  'XII'
+];
 
+const sections = ['A', 'B', 'C'];
 function suggestUsername(fullName) {
   if (!fullName) return '';
   const first = fullName.trim().split(/\s+/)[0].toLowerCase().replace(/[^a-z]/g, '');
@@ -57,13 +75,17 @@ export default function Teachers() {
     }));
   };
 
+  const classOptions = grades.flatMap(grade =>
+    sections.map(section => `${grade}-${section}`)
+  );
+
   const save = async (e) => {
     e.preventDefault(); setSaving(true);
     try {
       const payload = {
         ...form,
         subjects: form.subjects.split(',').map(s => s.trim()).filter(Boolean),
-        classes: form.classes.split(',').map(s => s.trim()).filter(Boolean),
+        classes: form.classes,
       };
       const { data } = await api.post('/teachers/with-user', payload);
       setCreated(data);
@@ -198,8 +220,41 @@ export default function Teachers() {
                     <TextField label="Joining Date" value={form.joiningDate} onChange={v => setForm({ ...form, joiningDate: v })} placeholder="YYYY-MM-DD" testId="tf-joining" />
                   </div>
                   <TextField label="Subjects (comma-separated)" value={form.subjects} onChange={v => setForm({ ...form, subjects: v })} testId="tf-subjects" />
-                  <TextField label="Classes (comma-separated e.g. VII-A, VIII-A)" value={form.classes} onChange={v => setForm({ ...form, classes: v })} testId="tf-classes" />
+                  <div>
+                  <label className="block text-xs uppercase tracking-widest text-muted-foreground mb-2">
+                    Classes
+                  </label>
 
+                  <div className="grid grid-cols-3 gap-2 max-h-56 overflow-y-auto border border-border rounded-lg p-3">
+                    {classOptions.map((cls) => (
+                      <label
+                        key={cls}
+                        className="flex items-center gap-2 text-sm cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={(form.classes || []).includes(cls)}
+                          onChange={(e) => {
+                            const current = form.classes || [];
+
+                            if (e.target.checked) {
+                              setForm({
+                                ...form,
+                                classes: [...current, cls]
+                              });
+                            } else {
+                              setForm({
+                                ...form,
+                                classes: current.filter(c => c !== cls)
+                              });
+                            }
+                          }}
+                        />
+                        {cls}
+                      </label>
+                    ))}
+                  </div>
+                </div>
                   <div className="pt-2">
                     <p className="overline">Login Credentials</p>
                     <p className="text-xs text-muted-foreground mt-1 mb-3">This teacher will use these to sign in. Passwords can be changed later.</p>

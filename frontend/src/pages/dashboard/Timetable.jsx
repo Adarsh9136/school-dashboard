@@ -120,7 +120,7 @@ export default function Timetable() {
         {!isTeacher && (
           <div className="flex items-center gap-2">
             <select value={className} onChange={e => setClassName(e.target.value)} className="h-11 px-4 rounded-full border border-border bg-transparent focus:border-primary outline-none mono text-sm" data-testid="tt-class">
-              {['V','VI','VII','VIII','IX','X','XI','XII'].map(c => <option key={c}>{c}</option>)}
+              {['Nursery','LKG','UKG','I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'].map(c => <option key={c}>{c}</option>)}
             </select>
             <select value={section} onChange={e => setSection(e.target.value)} className="h-11 px-4 rounded-full border border-border bg-transparent focus:border-primary outline-none mono text-sm" data-testid="tt-section">
               {['A','B','C'].map(c => <option key={c}>{c}</option>)}

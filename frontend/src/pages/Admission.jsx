@@ -7,7 +7,23 @@ import AmbientBackground from '@/components/common/AmbientBackground';
 import { toast } from 'sonner';
 import api from '@/lib/api';
 
-const grades = ['V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII'];
+const grades = [
+  'Nursery',
+  'LKG',
+  'UKG',
+  'I',
+  'II',
+  'III',
+  'IV',
+  'V',
+  'VI',
+  'VII',
+  'VIII',
+  'IX',
+  'X',
+  'XI',
+  'XII'
+];
 
 function FloatingInput({ label, name, type = 'text', value, onChange, required, testId }) {
   const has = !!value;

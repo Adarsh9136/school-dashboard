@@ -7,6 +7,25 @@ import { toast } from 'sonner';
 import EmptyState from '@/components/common/EmptyState';
 
 const emptyForm = { prn: '', fullName: '', className: 'VII', section: 'A', gender: '', dob: '', bloodGroup: '', address: '', parentName: '', parentPhone: '' };
+const grades = [
+  'Nursery',
+  'LKG',
+  'UKG',
+  'I',
+  'II',
+  'III',
+  'IV',
+  'V',
+  'VI',
+  'VII',
+  'VIII',
+  'IX',
+  'X',
+  'XI',
+  'XII'
+];
+
+const sections = ['A', 'B', 'C'];
 
 export default function Students() {
   const { user } = useAuth();
@@ -157,8 +176,21 @@ export default function Students() {
                 <div className="grid grid-cols-2 gap-3">
                   <TextField label="PRN" value={form.prn} disabled={drawer !== 'new'} onChange={v => setForm({ ...form, prn: v })} required testId="field-prn" />
                   <TextField label="Full Name" value={form.fullName} onChange={v => setForm({ ...form, fullName: v })} required testId="field-name" />
-                  <TextField label="Class" value={form.className} onChange={v => setForm({ ...form, className: v })} required testId="field-class" />
-                  <TextField label="Section" value={form.section} onChange={v => setForm({ ...form, section: v })} required testId="field-section" />
+                  <SelectField
+                    label="Class"
+                    value={form.className}
+                    onChange={v => setForm({ ...form, className: v })}
+                    options={grades}
+                    testId="field-class"
+                  />
+
+                  <SelectField
+                    label="Section"
+                    value={form.section}
+                    onChange={v => setForm({ ...form, section: v })}
+                    options={sections}
+                    testId="field-section"
+                  />
                   <TextField label="Date of Birth" value={form.dob} onChange={v => setForm({ ...form, dob: v })} placeholder="YYYY-MM-DD" testId="field-dob" />
                   <TextField label="Gender" value={form.gender} onChange={v => setForm({ ...form, gender: v })} testId="field-gender" />
                   <TextField label="Blood Group" value={form.bloodGroup} onChange={v => setForm({ ...form, bloodGroup: v })} testId="field-blood" />
@@ -185,6 +217,29 @@ export default function Students() {
           </>
         )}
       </AnimatePresence>
+    </div>
+  );
+}
+
+function SelectField({ label, value, onChange, options, testId }) {
+  return (
+    <div className="relative">
+      <select
+        value={value || ''}
+        onChange={(e) => onChange(e.target.value)}
+        data-testid={testId}
+        className="w-full h-12 px-3 rounded-lg bg-transparent border border-border focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none text-sm"
+      >
+        {options.map((option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
+
+      <label className="absolute left-3 -top-2 bg-card px-1 text-[9px] uppercase tracking-widest text-muted-foreground">
+        {label}
+      </label>
     </div>
   );
 }
