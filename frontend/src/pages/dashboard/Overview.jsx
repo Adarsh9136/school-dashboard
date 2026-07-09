@@ -144,40 +144,159 @@ function TeacherOverview() {
 
 function ParentOverview() {
   const [kids, setKids] = useState([]);
+  const [selectedKid, setSelectedKid] = useState(null);
   const [att, setAtt] = useState([]);
   const [fees, setFees] = useState([]);
+  const [tt, setTt] = useState([]);
 
   useEffect(() => {
-    api.get('/students').then(r => setKids(r.data)).catch(() => {});
-    api.get('/attendance').then(r => setAtt(r.data)).catch(() => {});
-    api.get('/fees').then(r => setFees(r.data)).catch(() => {});
+    api.get('/students').then(r => {
+      setKids(r.data);
+      if (r.data.length > 0) setSelectedKid(r.data[0]);
+    }).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!selectedKid) return;
+    Promise.all([
+      api.get('/attendance', { params: { refId: selectedKid._id } }),
+      api.get('/fees', { params: { studentId: selectedKid._id } }),
+      api.get('/timetable', { params: { className: selectedKid.className, section: selectedKid.section } }),
+    ]).then(([a, f, t]) => { setAtt(a.data); setFees(f.data); setTt(t.data); }).catch(() => {});
+  }, [selectedKid]);
+
+  if (kids.length === 0) {
+    return <EmptyState icon={GraduationCap} title="No children linked yet" description="Please contact your school administrator." />;
+  }
+
+  const today = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+  const todayClasses = tt.filter(s => s.day === today).sort((a, b) => a.period - b.period);
+  const presentCount = att.filter(a => a.status === 'present').length;
+  const absentCount = att.filter(a => a.status === 'absent').length;
+  const attPct = att.length ? Math.round((presentCount / att.length) * 100) : 0;
+  const pendingFees = fees.filter(f => f.status === 'pending').length;
+  const paidFees = fees.filter(f => f.status === 'paid').length;
 
   return (
     <motion.div variants={stagger} initial="hidden" animate="show" className="space-y-6">
-      <div className="grid md:grid-cols-3 gap-4">
-        <motion.div variants={item}><StatCard label="Children" value={kids.length} icon={GraduationCap} tone="primary" testId="stat-children" /></motion.div>
-        <motion.div variants={item}><StatCard label="This Month Attendance" value={att.filter(a => a.status === 'present').length} suffix={` / ${att.length || 0}`} icon={ClipboardCheck} tone="secondary" testId="stat-att-count" /></motion.div>
-        <motion.div variants={item}><StatCard label="Pending Fees" value={fees.filter(f => f.status === 'pending').length} icon={Wallet} tone="accent" testId="stat-fees" /></motion.div>
-      </div>
-      {kids.map((k, i) => (
-        <motion.div key={k._id} variants={item} className="rounded-2xl border border-border bg-card p-6 card-lift">
-          <div className="flex items-center gap-4">
-            <div className="h-14 w-14 rounded-full bg-primary/10 text-primary grid place-items-center font-serif text-xl">
-              {k.fullName[0]}
-            </div>
-            <div className="flex-1">
-              <p className="font-serif text-2xl">{k.fullName}</p>
-              <div className="flex items-center gap-3 mt-1 text-xs mono text-muted-foreground">
-                <span>PRN {k.prn}</span>
-                <span className="h-1 w-1 rounded-full bg-muted-foreground/50" />
-                <span>{k.className} · Section {k.section}</span>
+      {/* Child selector — one card per child */}
+      {kids.length > 1 && (
+        <motion.div variants={item} className="flex flex-wrap gap-3" data-testid="child-selector">
+          {kids.map(k => {
+            const active = selectedKid && selectedKid._id === k._id;
+            return (
+              <button
+                key={k._id}
+                onClick={() => setSelectedKid(k)}
+                className={`flex items-center gap-3 px-4 py-3 rounded-2xl border transition-all ${active ? 'border-primary bg-primary/5 shadow-lg shadow-primary/10' : 'border-border bg-card hover:border-primary/40'}`}
+                data-testid={`child-pill-${k.prn}`}
+              >
+                <div className={`h-9 w-9 rounded-full grid place-items-center font-serif ${active ? 'bg-primary text-primary-foreground' : 'bg-primary/10 text-primary'}`}>
+                  {k.fullName[0]}
+                </div>
+                <div className="text-left">
+                  <p className={`text-sm ${active ? 'font-semibold' : ''}`}>{k.fullName.split(' ')[0]}</p>
+                  <p className="text-[10px] mono text-muted-foreground">{k.className}-{k.section}</p>
+                </div>
+              </button>
+            );
+          })}
+        </motion.div>
+      )}
+
+      {selectedKid && (
+        <>
+          {/* Child hero card */}
+          <motion.div variants={item} className="rounded-2xl border border-border bg-card p-6 card-lift">
+            <div className="flex items-start gap-5 flex-wrap">
+              <div className="h-16 w-16 rounded-full bg-primary/10 text-primary grid place-items-center font-serif text-2xl">
+                {selectedKid.fullName[0]}
+              </div>
+              <div className="flex-1 min-w-[220px]">
+                <p className="overline">Student Profile</p>
+                <p className="font-serif text-3xl mt-1" data-testid="parent-active-child-name">{selectedKid.fullName}</p>
+                <div className="flex flex-wrap items-center gap-2 mt-2 text-xs mono text-muted-foreground">
+                  <span>PRN {selectedKid.prn}</span>
+                  <span className="h-1 w-1 rounded-full bg-muted-foreground/50" />
+                  <span>{selectedKid.className} · Section {selectedKid.section}</span>
+                  {selectedKid.bloodGroup && (<><span className="h-1 w-1 rounded-full bg-muted-foreground/50" /><span>Blood {selectedKid.bloodGroup}</span></>)}
+                </div>
               </div>
             </div>
-          </div>
-        </motion.div>
-      ))}
-      {kids.length === 0 && <EmptyState icon={GraduationCap} title="No children linked yet" description="Please contact your school administrator." />}
+          </motion.div>
+
+          {/* Stats per child */}
+          <motion.div variants={item} className="grid md:grid-cols-4 gap-4">
+            <StatCard label="Attendance %" value={attPct} suffix="%" icon={ClipboardCheck} tone="secondary" trend={`${presentCount} present · ${absentCount} absent`} testId="child-stat-att" />
+            <StatCard label="Fees Paid" value={paidFees} icon={Wallet} tone="secondary" testId="child-stat-paid" />
+            <StatCard label="Fees Pending" value={pendingFees} icon={ClockAlert} tone="primary" testId="child-stat-pending" />
+            <StatCard label="Classes Today" value={todayClasses.length} icon={CalendarDays} tone="accent" testId="child-stat-classes" />
+          </motion.div>
+
+          {/* Today's schedule */}
+          <motion.div variants={item} className="rounded-2xl border border-border bg-card p-6">
+            <p className="overline">Today · {today}</p>
+            <h3 className="font-serif text-2xl mt-2">{selectedKid.fullName.split(' ')[0]}'s classes today</h3>
+            {todayClasses.length === 0 ? (
+              <p className="mt-4 text-sm text-muted-foreground italic">No classes scheduled today.</p>
+            ) : (
+              <div className="mt-6 grid gap-3">
+                {todayClasses.map(c => (
+                  <div key={c._id} className="flex items-center gap-4 rounded-xl border border-border p-4" data-testid={`child-today-${c.period}`}>
+                    <div className="h-11 w-11 rounded-lg bg-primary/10 text-primary grid place-items-center mono text-sm">P{c.period}</div>
+                    <div className="flex-1">
+                      <p className="font-medium">{c.subject}</p>
+                      <p className="text-xs text-muted-foreground mono">{c.teacherName || '—'}</p>
+                    </div>
+                    {c.isSubstitute && <span className="text-[10px] mono px-2 py-1 rounded-full bg-accent/20 text-accent-foreground border border-accent/40">SUBSTITUTE</span>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </motion.div>
+
+          {/* Recent attendance history */}
+          <motion.div variants={item} className="rounded-2xl border border-border bg-card p-6">
+            <p className="overline">Recent Attendance</p>
+            <h3 className="font-serif text-2xl mt-2">Last 10 days</h3>
+            {att.length === 0 ? (
+              <p className="mt-4 text-sm text-muted-foreground italic">No attendance records yet.</p>
+            ) : (
+              <div className="mt-4 flex flex-wrap gap-2">
+                {att.slice(0, 30).map(a => (
+                  <div key={a._id} className={`flex flex-col items-center gap-1 px-3 py-2 rounded-lg border text-[10px] mono ${a.status === 'present' ? 'cell-present' : a.status === 'absent' ? 'cell-absent' : 'cell-late'}`} data-testid={`child-att-${a.date}`}>
+                    <span className="font-medium">{a.date.slice(5)}</span>
+                    <span className="uppercase tracking-wider">{a.status[0]}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </motion.div>
+
+          {/* Fees status per month */}
+          <motion.div variants={item} className="rounded-2xl border border-border bg-card p-6">
+            <p className="overline">Fees</p>
+            <h3 className="font-serif text-2xl mt-2">Payment status</h3>
+            {fees.length === 0 ? (
+              <p className="mt-4 text-sm text-muted-foreground italic">No fee records yet.</p>
+            ) : (
+              <div className="mt-4 grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                {fees.map(f => (
+                  <div key={f._id} className="flex items-center justify-between rounded-lg border border-border p-3" data-testid={`child-fee-${f.month}`}>
+                    <div>
+                      <p className="text-sm font-medium">{f.month}</p>
+                      <p className="text-[10px] mono text-muted-foreground">Due {f.dueDate}</p>
+                    </div>
+                    <span className={`text-[10px] mono uppercase tracking-widest px-2 py-1 rounded-full border ${f.status === 'paid' ? 'cell-present' : 'cell-absent'}`}>
+                      {f.status}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </motion.div>
+        </>
+      )}
     </motion.div>
   );
 }

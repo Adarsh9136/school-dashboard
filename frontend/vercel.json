@@ -5,6 +5,12 @@
   "installCommand": "yarn install",
   "framework": "create-react-app",
   "devCommand": "yarn start",
+  "build": {
+    "env": {
+      "CI": "false",
+      "DISABLE_ESLINT_PLUGIN": "true"
+    }
+  },
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ],

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Save, ClipboardCheck, Users, Clock, Check, X as XIcon } from 'lucide-react';
+import { Save, ClipboardCheck, Clock, Check, X as XIcon, Lock } from 'lucide-react';
 import api from '@/lib/api';
 import { useAuth } from '@/context/AuthContext';
 import { toast } from 'sonner';
@@ -22,15 +22,52 @@ export default function Attendance() {
   const [flashing, setFlashing] = useState({});
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [availableClasses, setAvailableClasses] = useState([]); // [{className, section}]
+  const [selectedClass, setSelectedClass] = useState(null); // {className, section}
 
-  const canMark = ['teacher', 'principal', 'admin', 'scanner'].includes(user.role);
+  const isTeacher = user.role === 'teacher';
   const isParent = user.role === 'parent';
+  const canMark = ['teacher', 'principal', 'admin', 'scanner'].includes(user.role);
+  const dateLocked = isTeacher; // teachers can only mark today
+
+  // Load available classes for the current user
+  useEffect(() => {
+    (async () => {
+      if (isTeacher) {
+        try {
+          const { data } = await api.get('/teachers/me/classes');
+          setAvailableClasses(data.classes || []);
+          if (data.classes && data.classes.length > 0) {
+            setSelectedClass(data.classes[0]);
+          }
+        } catch (e) { toast.error('Failed to load your classes'); }
+      } else if (isParent) {
+        // parent: no class selector — sees own children
+        setSelectedClass(null);
+      } else {
+        // principal/admin: derive from all students
+        try {
+          const { data } = await api.get('/students');
+          const set = new Set();
+          data.forEach(s => set.add(`${s.className}|${s.section}`));
+          const cls = Array.from(set).map(k => {
+            const [className, section] = k.split('|');
+            return { className, section };
+          });
+          setAvailableClasses(cls);
+          if (cls.length > 0) setSelectedClass(cls[0]);
+        } catch(e){}
+      }
+    })();
+    // eslint-disable-next-line
+  }, []);
 
   const load = async () => {
     setLoading(true);
     try {
+      const studentsParams = isParent ? {} : (selectedClass ? { className: selectedClass.className, section: selectedClass.section } : {});
       const [s, a] = await Promise.all([
-        api.get('/students'),
+        api.get('/students', { params: studentsParams }),
         api.get('/attendance', { params: { type: 'student', date } }),
       ]);
       setStudents(s.data);
@@ -42,7 +79,10 @@ export default function Attendance() {
     setLoading(false);
   };
 
-  useEffect(() => { load(); /* eslint-disable-next-line */ }, [date]);
+  useEffect(() => {
+    if (isParent || selectedClass) load();
+    // eslint-disable-next-line
+  }, [date, selectedClass]);
 
   const mark = (refId, status) => {
     if (!canMark) return;
@@ -62,10 +102,19 @@ export default function Attendance() {
   };
 
   const save = async () => {
+    if (isTeacher && !selectedClass) {
+      toast.error('Please select a class first');
+      return;
+    }
     setSaving(true);
     try {
       const entries = Object.entries(marks).map(([refId, status]) => ({ refId, status }));
-      await api.post('/attendance/mark', { type: 'student', date, entries, period: 0 });
+      const payload = { type: 'student', date, entries, period: 0 };
+      if (isTeacher && selectedClass) {
+        payload.className = selectedClass.className;
+        payload.section = selectedClass.section;
+      }
+      await api.post('/attendance/mark', payload);
       toast.success('Attendance saved');
       await load();
     } catch (e) {
@@ -87,11 +136,49 @@ export default function Attendance() {
         <div>
           <p className="overline">Roll Call</p>
           <h1 className="font-serif text-4xl mt-2">Attendance</h1>
-          <p className="text-muted-foreground mt-1">{isParent ? 'View your child\'s attendance' : 'Mark today\'s attendance and save'}</p>
+          <p className="text-muted-foreground mt-1">
+            {isParent ? "View your child's attendance" :
+             isTeacher ? 'You may mark attendance for today, and only for classes you teach.' :
+             "Mark today's attendance and save"}
+          </p>
         </div>
-        <div className="flex items-center gap-3">
-          <input type="date" value={date} onChange={e => setDate(e.target.value)} className="h-11 px-4 rounded-full border border-border bg-transparent focus:border-primary outline-none mono text-sm" data-testid="date-picker" />
-          {canMark && (
+        <div className="flex items-center gap-3 flex-wrap">
+          {/* Class selector — hidden for parents */}
+          {!isParent && availableClasses.length > 0 && (
+            <div className="flex items-center gap-1 rounded-full border border-border p-1" data-testid="class-picker">
+              {availableClasses.map(c => {
+                const active = selectedClass && selectedClass.className === c.className && selectedClass.section === c.section;
+                return (
+                  <button
+                    key={`${c.className}-${c.section}`}
+                    onClick={() => setSelectedClass(c)}
+                    className={`text-xs mono px-3 py-1.5 rounded-full transition-colors ${active ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
+                    data-testid={`class-pill-${c.className}-${c.section}`}
+                  >
+                    {c.className}-{c.section}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          <div className="relative">
+            <input
+              type="date"
+              value={date}
+              max={dateLocked ? today : undefined}
+              min={dateLocked ? today : undefined}
+              onChange={e => setDate(e.target.value)}
+              disabled={dateLocked}
+              className="h-11 px-4 rounded-full border border-border bg-transparent focus:border-primary outline-none mono text-sm disabled:opacity-70 disabled:cursor-not-allowed pr-9"
+              data-testid="date-picker"
+            />
+            {dateLocked && (
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground" title="Teachers may only mark today's attendance">
+                <Lock size={12} />
+              </span>
+            )}
+          </div>
+          {canMark && !isParent && (
             <button onClick={save} disabled={saving} className="btn-magnetic text-sm py-2" data-testid="save-attendance">
               <Save size={14} /> {saving ? 'Saving…' : 'Save'}
             </button>
@@ -99,15 +186,32 @@ export default function Attendance() {
         </div>
       </div>
 
-      {/* Quick stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-        <StatMini label="Total" value={stats.total} tone="ink" />
-        <StatMini label="Present" value={stats.present} tone="secondary" />
-        <StatMini label="Absent" value={stats.absent} tone="primary" />
-        <StatMini label="Attendance %" value={`${stats.pct}%`} tone="accent" />
-      </div>
+      {isTeacher && availableClasses.length === 0 && (
+        <EmptyState
+          icon={Lock}
+          title="No classes assigned"
+          description="You currently have no timetable slots. Ask your Principal to assign classes to you before marking attendance."
+        />
+      )}
 
-      {canMark && (
+      {selectedClass && (
+        <p className="mb-6 text-xs mono text-muted-foreground">
+          Marking for <span className="text-foreground font-semibold">{selectedClass.className}-{selectedClass.section}</span> on <span className="text-foreground">{date}</span>
+          {dateLocked && <span> · <span className="text-primary">today only</span></span>}
+        </p>
+      )}
+
+      {/* Quick stats */}
+      {(!isTeacher || selectedClass) && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+          <StatMini label="Total" value={stats.total} tone="ink" />
+          <StatMini label="Present" value={stats.present} tone="secondary" />
+          <StatMini label="Absent" value={stats.absent} tone="primary" />
+          <StatMini label="Attendance %" value={`${stats.pct}%`} tone="accent" />
+        </div>
+      )}
+
+      {canMark && !isParent && students.length > 0 && (
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <span className="overline mr-2">Bulk</span>
           {statusOptions.map(o => (
@@ -121,7 +225,7 @@ export default function Attendance() {
       {loading ? (
         <div className="grid grid-cols-1 gap-2">{Array.from({length:6}).map((_,i)=><div key={i} className="skeleton h-14" />)}</div>
       ) : students.length === 0 ? (
-        <EmptyState icon={ClipboardCheck} title="No students to display" />
+        <EmptyState icon={ClipboardCheck} title="No students to display" description={isTeacher && selectedClass ? `No students found in ${selectedClass.className}-${selectedClass.section}.` : ''} />
       ) : (
         <div className="rounded-2xl border border-border overflow-hidden">
           {students.map((s, i) => {

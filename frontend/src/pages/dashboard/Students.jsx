@@ -37,8 +37,12 @@ export default function Students() {
     e.preventDefault(); setSaving(true);
     try {
       if (drawer === 'new') {
-        await api.post('/students', form);
-        toast.success('Student added');
+        const { data } = await api.post('/students', form);
+        if (data.parentUser) {
+          toast.success(`Student added. Parent login: ${data.parentUser.username} / Parent@123`);
+        } else {
+          toast.success('Student added');
+        }
       } else {
         await api.patch(`/students/${drawer._id}`, form);
         toast.success('Student updated');
@@ -162,6 +166,17 @@ export default function Students() {
                   <TextField label="Parent Phone" value={form.parentPhone} onChange={v => setForm({ ...form, parentPhone: v })} testId="field-parent-phone" />
                 </div>
                 <TextField label="Address" value={form.address} onChange={v => setForm({ ...form, address: v })} testId="field-address" />
+                {form.parentPhone && drawer === 'new' && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+                    className="rounded-lg border border-accent/50 bg-accent/5 p-4 text-sm"
+                    data-testid="parent-login-preview"
+                  >
+                    <p className="overline text-accent-foreground">Parent Login (auto-created)</p>
+                    <p className="mt-2">Username: <span className="mono font-medium">{form.parentPhone.replace(/[^0-9+]/g, '').replace(/^\+/, '')}</span></p>
+                    <p className="mt-1">Password: <span className="mono font-medium">Parent@123</span> <span className="text-xs text-muted-foreground">(default — parent can change on first login)</span></p>
+                  </motion.div>
+                )}
                 <button type="submit" disabled={saving} className="btn-magnetic w-full justify-center" data-testid="save-student">
                   {saving ? 'Saving…' : (drawer === 'new' ? 'Create Student' : 'Save Changes')}
                 </button>
