@@ -233,6 +233,35 @@ class TestTimetable:
         # all slots should belong to teacher (linkedRef)
         assert isinstance(slots, list)
 
+    # Regression: /timetable/affected returns per-slot conflicts map
+    def test_affected_endpoint_returns_conflicts(self, tokens):
+        # Grab a teacher id
+        tr = requests.get(f"{API}/teachers", headers=_hdr(tokens["principal"]), timeout=15)
+        assert tr.status_code == 200
+        teacher_id = tr.json()[0]["_id"]
+        # Query affected classes over a Mon–Tue window
+        r = requests.get(
+            f"{API}/timetable/affected",
+            headers=_hdr(tokens["principal"]),
+            params={"teacherId": teacher_id, "fromDate": "2026-02-02", "toDate": "2026-02-03"},
+            timeout=15,
+        )
+        assert r.status_code == 200, r.text
+        days = r.json()
+        assert isinstance(days, list)
+        # Each slot on each day should carry a `conflicts` object (may be empty)
+        for d in days:
+            assert "day" in d and "date" in d and "slots" in d
+            for s in d["slots"]:
+                assert "conflicts" in s and isinstance(s["conflicts"], dict)
+                for _tid, reason in s["conflicts"].items():
+                    assert reason in ("scheduled", "on_leave")
+
+    def test_affected_endpoint_requires_params(self, tokens):
+        r = requests.get(f"{API}/timetable/affected", headers=_hdr(tokens["principal"]), timeout=15)
+        assert r.status_code == 400
+
+
 
 # ---------- Fees ----------
 class TestFees:
